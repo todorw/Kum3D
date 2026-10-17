@@ -70,7 +70,7 @@ export function buildRevolve(radii, { step, smoothing, hollow, wall, floor }) {
   const last = rows.findLastIndex((r) => r > 0);
   if (first < 0 || last - first < 1) return null;
 
-  const profile = smooth(rows.slice(first, last + 1), smoothing).map((r) => Math.max(r * step, MIN_RADIUS));
+  const profile = smooth(smooth(rows.slice(first, last + 1), smoothing), smoothing).map((r) => Math.max(r * step, MIN_RADIUS));
   const n = profile.length;
   const height = n * step;
   const dz = height / (n - 1);
