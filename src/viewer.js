@@ -63,6 +63,13 @@ export class Viewer {
     }
   }
 
+  clear() {
+    if (!this.mesh) return;
+    this.scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    this.mesh = null;
+  }
+
   frame([w, l, h]) {
     const radius = Math.hypot(w, l, h) / 2;
     const distance = radius / Math.sin(THREE.MathUtils.degToRad(this.camera.fov / 2));
