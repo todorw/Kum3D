@@ -115,11 +115,84 @@ function fixPinches(mask, cols, rows) {
   }
 }
 
-export function buildMask({ cols, rows, data }, { cutout, tolerance }) {
+function distanceTo(mask, cols, rows, target) {
+  const dist = new Int32Array(mask.length);
+  for (let i = 0; i < mask.length; i++) dist[i] = mask[i] === target ? 0 : cols + rows;
+  const relax = (i, j) => {
+    if (dist[j] + 1 < dist[i]) dist[i] = dist[j] + 1;
+  };
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      if (c > 0) relax(i, i - 1);
+      if (r === 0) continue;
+      relax(i, i - cols);
+      if (c > 0) relax(i, i - cols - 1);
+      if (c < cols - 1) relax(i, i - cols + 1);
+    }
+  }
+  for (let r = rows - 1; r >= 0; r--) {
+    for (let c = cols - 1; c >= 0; c--) {
+      const i = r * cols + c;
+      if (c < cols - 1) relax(i, i + 1);
+      if (r === rows - 1) continue;
+      relax(i, i + cols);
+      if (c < cols - 1) relax(i, i + cols + 1);
+      if (c > 0) relax(i, i + cols - 1);
+    }
+  }
+  return dist;
+}
+
+function fillHoles(mask, cols, rows) {
+  const outside = new Uint8Array(mask.length);
+  const queue = new Int32Array(mask.length);
+  let head = 0;
+  let tail = 0;
+  const visit = (i) => {
+    if (!mask[i] && !outside[i]) {
+      outside[i] = 1;
+      queue[tail++] = i;
+    }
+  };
+  for (let c = 0; c < cols; c++) {
+    visit(c);
+    visit((rows - 1) * cols + c);
+  }
+  for (let r = 0; r < rows; r++) {
+    visit(r * cols);
+    visit(r * cols + cols - 1);
+  }
+  while (head < tail) {
+    const i = queue[head++];
+    const c = i % cols;
+    if (c > 0) visit(i - 1);
+    if (c < cols - 1) visit(i + 1);
+    if (i >= cols) visit(i - cols);
+    if (i < mask.length - cols) visit(i + cols);
+  }
+  for (let i = 0; i < mask.length; i++) {
+    if (!outside[i]) mask[i] = 1;
+  }
+}
+
+function solidify(mask, cols, rows) {
+  const radius = Math.round(Math.max(cols, rows) / 100) + 1;
+  const grown = distanceTo(mask, cols, rows, 1);
+  for (let i = 0; i < mask.length; i++) mask[i] = grown[i] <= radius ? 1 : 0;
+  fillHoles(mask, cols, rows);
+  const shrunk = distanceTo(mask, cols, rows, 0);
+  for (let i = 0; i < mask.length; i++) {
+    if (shrunk[i] <= radius) mask[i] = 0;
+  }
+}
+
+export function buildMask({ cols, rows, data }, { cutout, tolerance, solid }) {
   const mask = new Uint8Array(cols * rows).fill(1);
   if (!cutout) return mask;
   floodBackground(mask, data, cols, rows, tolerance);
   removeSpecks(mask, cols);
+  if (solid) solidify(mask, cols, rows);
   fixPinches(mask, cols, rows);
   return mask;
 }
