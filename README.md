@@ -8,7 +8,7 @@ Turn any picture into a printable 3D model and export it as STL. Runs on Windows
 - Background cutout: transparent or plain backgrounds are removed so only the object gets printed
 - Relief mode: raised picture shaped like the object
 - Lithophane mode: thin panel that shows the photo when backlit
-- Round mode: spins a side view of a bottle, vase, cup or glass into a real 3D body, solid or hollow. Handles a clear bottle, glare, labels and mug handles
+- Round mode: spins a side view of a bottle, vase, cup or glass into a real 3D body, solid or hollow. Copes with clear plastic, glare, labels and mug handles
 - Live 3D preview
 - Watertight binary STL export in millimetres, ready for any slicer
 
