@@ -62,7 +62,16 @@ function prepare({ resolution, cutout, tolerance }) {
   const options = { cutout, tolerance: tolerance / 100, solid };
   let sample = sampleImage(state.image, resolution);
   let mask = buildMask(sample, options);
-  const bounds = cutout && maskBounds(mask, sample.cols, sample.rows);
+  let bounds = cutout && maskBounds(mask, sample.cols, sample.rows);
+  if (bounds && solid) {
+    const raw = maskBounds(buildMask(sample, { ...options, solid: false }), sample.cols, sample.rows) ?? bounds;
+    bounds = {
+      x0: Math.min(bounds.x0, raw.x0),
+      y0: Math.min(bounds.y0, raw.y0),
+      x1: Math.max(bounds.x1, raw.x1),
+      y1: Math.max(bounds.y1, raw.y1)
+    };
+  }
   if (bounds) {
     sample = sampleImage(state.image, resolution, cropRegion(bounds, sample));
     mask = buildMask(sample, options);
