@@ -1,56 +1,83 @@
-export function buildMesh({ cols, rows, values }, { width, base, depth }) {
-  const step = width / (cols - 1);
-  const length = step * (rows - 1);
-  const count = cols * rows;
-  const positions = new Float32Array(count * 2 * 3);
+export function buildRelief({ cols, rows, values, mask }, { step, base, depth }) {
+  const vcols = cols + 1;
+  const vindex = new Int32Array(vcols * (rows + 1)).fill(-1);
+  const heights = [];
+  for (let r = 0; r <= rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      let sum = 0;
+      let n = 0;
+      for (let pr = r - 1; pr <= r; pr++) {
+        for (let pc = c - 1; pc <= c; pc++) {
+          if (pr < 0 || pc < 0 || pr >= rows || pc >= cols) continue;
+          const i = pr * cols + pc;
+          if (!mask[i]) continue;
+          sum += values[i];
+          n++;
+        }
+      }
+      if (!n) continue;
+      vindex[r * vcols + c] = heights.length;
+      heights.push(sum / n);
+    }
+  }
 
-  for (let r = 0; r < rows; r++) {
-    const y = length / 2 - r * step;
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c;
-      const x = c * step - width / 2;
-      const t = i * 3;
-      const b = (count + i) * 3;
-      positions[t] = positions[b] = x;
-      positions[t + 1] = positions[b + 1] = y;
-      positions[t + 2] = base + values[i] * depth;
+  const count = heights.length;
+  if (!count) return null;
+  const width = cols * step;
+  const length = rows * step;
+  const positions = new Float32Array(count * 2 * 3);
+  for (let r = 0; r <= rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      const v = vindex[r * vcols + c];
+      if (v < 0) continue;
+      const t = v * 3;
+      const b = (count + v) * 3;
+      positions[t] = positions[b] = c * step - width / 2;
+      positions[t + 1] = positions[b + 1] = length / 2 - r * step;
+      positions[t + 2] = base + heights[v] * depth;
       positions[b + 2] = 0;
     }
   }
 
-  const loop = [];
-  for (let c = 0; c < cols - 1; c++) loop.push((rows - 1) * cols + c);
-  for (let r = rows - 1; r > 0; r--) loop.push(r * cols + cols - 1);
-  for (let c = cols - 1; c > 0; c--) loop.push(c);
-  for (let r = 0; r < rows - 1; r++) loop.push(r * cols);
+  const open = (r, c) => r < 0 || c < 0 || r >= rows || c >= cols || !mask[r * cols + c];
+  let quads = 0;
+  let walls = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!mask[r * cols + c]) continue;
+      quads++;
+      walls += open(r, c - 1) + open(r + 1, c) + open(r, c + 1) + open(r - 1, c);
+    }
+  }
 
-  const quads = (cols - 1) * (rows - 1);
-  const indices = new Uint32Array((quads * 4 + loop.length * 2) * 3);
+  const indices = new Uint32Array((quads * 4 + walls * 2) * 3);
   let k = 0;
   const tri = (a, b, c) => {
     indices[k++] = a;
     indices[k++] = b;
     indices[k++] = c;
   };
-
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      const a = r * cols + c;
-      const b = a + 1;
-      const d = a + cols;
-      const e = d + 1;
-      tri(a, d, b);
-      tri(b, d, e);
-      tri(count + a, count + b, count + d);
-      tri(count + b, count + e, count + d);
-    }
-  }
-
-  for (let i = 0; i < loop.length; i++) {
-    const p = loop[i];
-    const q = loop[(i + 1) % loop.length];
+  const wall = (p, q) => {
     tri(q, p, count + p);
     tri(q, count + p, count + q);
+  };
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!mask[r * cols + c]) continue;
+      const a = vindex[r * vcols + c];
+      const b = vindex[r * vcols + c + 1];
+      const e = vindex[(r + 1) * vcols + c + 1];
+      const d = vindex[(r + 1) * vcols + c];
+      tri(a, d, e);
+      tri(a, e, b);
+      tri(count + a, count + e, count + d);
+      tri(count + a, count + b, count + e);
+      if (open(r, c - 1)) wall(a, d);
+      if (open(r + 1, c)) wall(d, e);
+      if (open(r, c + 1)) wall(e, b);
+      if (open(r - 1, c)) wall(b, a);
+    }
   }
 
   return { positions, indices, size: [width, length, base + depth] };
