@@ -1,17 +1,27 @@
 import { Viewer } from './viewer.js';
-import { sampleImage, buildHeightmap } from './heightmap.js';
-import { buildMesh } from './mesh.js';
+import { sampleImage } from './image.js';
+import { buildMask, maskBounds } from './mask.js';
+import { buildHeightmap } from './heightmap.js';
+import { buildRelief } from './mesh.js';
+import { extractProfile, buildRevolve } from './revolve.js';
 import { toBinaryStl } from './stl.js';
 
 const $ = (id) => document.getElementById(id);
-const fields = ['width', 'base', 'depth', 'resolution', 'smoothing', 'contrast', 'border'];
+const fields = ['size', 'resolution', 'smoothing', 'tolerance', 'base', 'depth', 'contrast', 'border', 'wall', 'floor'];
+const toggles = ['cutout', 'invert', 'hollow'];
 const presets = {
-  relief: { base: 2, depth: 4, border: 0, smoothing: 1, invert: false },
-  lithophane: { base: 0.8, depth: 2.4, border: 3, smoothing: 0, invert: true }
+  relief: { base: 2, depth: 4, border: 0, smoothing: 1, invert: false, cutout: true },
+  lithophane: { base: 0.8, depth: 2.4, border: 3, smoothing: 0, invert: true, cutout: false },
+  vase: { smoothing: 2 }
+};
+const hints = {
+  relief: 'Raised picture. Bright areas stand tallest, the background gets cut away.',
+  lithophane: 'Thin panel that reveals the photo when you hold it up to light.',
+  vase: 'Spins the outline around its centre. Use a straight side view of a vase, cup or bottle.'
 };
 
 const viewer = new Viewer($('stage'));
-const state = { image: null, thumbUrl: null, name: 'model', sample: null, mesh: null, frame: 0 };
+const state = { mode: 'relief', image: null, thumbUrl: null, name: 'model', prepared: null, mesh: null, frame: 0 };
 
 const setStatus = (text) => {
   $('status').textContent = text;
@@ -19,7 +29,8 @@ const setStatus = (text) => {
 
 function params() {
   const p = Object.fromEntries(fields.map((f) => [f, Number($(f).value)]));
-  p.invert = $('invert').checked;
+  for (const t of toggles) p[t] = $(t).checked;
+  p.cutout ||= state.mode === 'vase';
   return p;
 }
 
@@ -27,20 +38,70 @@ function syncOutputs() {
   for (const f of fields) document.querySelector(`output[for="${f}"]`).value = $(f).value;
 }
 
-function rebuild(refit = false) {
-  if (!state.image) return;
-  const p = params();
-  if (!state.sample || state.sample.resolution !== p.resolution) {
-    state.sample = { ...sampleImage(state.image, p.resolution), resolution: p.resolution };
+function refreshVisibility() {
+  for (const el of document.querySelectorAll('[data-modes]')) {
+    el.hidden = !el.dataset.modes.split(' ').includes(state.mode);
   }
-  const step = p.width / (state.sample.cols - 1);
-  const map = buildHeightmap(state.sample, {
+  $('toleranceField').hidden = state.mode !== 'vase' && !$('cutout').checked;
+  $('wallField').hidden = $('floorField').hidden = state.mode !== 'vase' || !$('hollow').checked;
+}
+
+function cropRegion({ x0, y0, x1, y1 }, sample) {
+  const s = 1 / sample.scale;
+  const { width, height } = state.image;
+  const x = Math.max(0, (x0 - 1) * s);
+  const y = Math.max(0, (y0 - 1) * s);
+  return { x, y, w: Math.min(width, (x1 + 2) * s) - x, h: Math.min(height, (y1 + 2) * s) - y };
+}
+
+function prepare({ resolution, cutout, tolerance }) {
+  const key = `${resolution}|${cutout}|${tolerance}`;
+  if (state.prepared?.key === key) return state.prepared;
+  const options = { cutout, tolerance: tolerance / 100 };
+  let sample = sampleImage(state.image, resolution);
+  let mask = buildMask(sample, options);
+  const bounds = cutout && maskBounds(mask, sample.cols, sample.rows);
+  if (bounds) {
+    sample = sampleImage(state.image, resolution, cropRegion(bounds, sample));
+    mask = buildMask(sample, options);
+  }
+  state.prepared = { key, sample, mask };
+  return state.prepared;
+}
+
+function build(p) {
+  const { sample, mask } = prepare(p);
+  const { cols, rows } = sample;
+  const step = p.size / Math.max(cols, rows);
+  if (state.mode === 'vase') {
+    return buildRevolve(extractProfile(mask, cols, rows), {
+      step,
+      smoothing: p.smoothing,
+      hollow: p.hollow,
+      wall: p.wall,
+      floor: p.floor
+    });
+  }
+  const values = buildHeightmap(sample, mask, {
     invert: p.invert,
     contrast: p.contrast,
     smoothing: p.smoothing,
     border: Math.round(p.border / step)
   });
-  state.mesh = buildMesh(map, p);
+  return buildRelief({ cols, rows, values, mask }, { step, base: p.base, depth: p.depth });
+}
+
+function rebuild(refit = false) {
+  if (!state.image) return;
+  state.mesh = build(params());
+  $('export').disabled = !state.mesh;
+  if (!state.mesh) {
+    viewer.clear();
+    $('statSize').textContent = $('statTris').textContent = '–';
+    setStatus('Nothing left after cutting out the background. Try a lower tolerance.');
+    return;
+  }
+  setStatus('');
   viewer.setMesh(state.mesh);
   if (refit) viewer.frame(state.mesh.size);
   const [w, l, h] = state.mesh.size;
@@ -60,7 +121,7 @@ async function loadFile(file) {
     const image = await createImageBitmap(file);
     state.image?.close();
     state.image = image;
-    state.sample = null;
+    state.prepared = null;
     state.name = file.name.replace(/\.[^.]+$/, '') || 'model';
     if (state.thumbUrl) URL.revokeObjectURL(state.thumbUrl);
     state.thumbUrl = URL.createObjectURL(file);
@@ -68,8 +129,6 @@ async function loadFile(file) {
     $('thumb').hidden = false;
     $('dropText').hidden = true;
     $('empty').hidden = true;
-    $('export').disabled = false;
-    setStatus('');
     rebuild(true);
   } catch {
     setStatus('Could not read that image');
@@ -77,13 +136,17 @@ async function loadFile(file) {
 }
 
 function applyMode(mode) {
+  state.mode = mode;
   for (const btn of $('mode').querySelectorAll('button')) {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   }
-  const { invert, ...values } = presets[mode];
-  for (const [key, value] of Object.entries(values)) $(key).value = value;
-  $('invert').checked = invert;
-  schedule();
+  for (const [key, value] of Object.entries(presets[mode])) {
+    if (typeof value === 'boolean') $(key).checked = value;
+    else $(key).value = value;
+  }
+  $('hint').textContent = hints[mode];
+  refreshVisibility();
+  schedule(true);
 }
 
 async function exportStl() {
@@ -120,12 +183,17 @@ document.addEventListener('paste', (e) => {
 
 $('mode').addEventListener('click', (e) => {
   const mode = e.target.closest('button')?.dataset.mode;
-  if (mode) applyMode(mode);
+  if (mode && mode !== state.mode) applyMode(mode);
 });
 
 for (const f of fields) $(f).addEventListener('input', () => schedule());
-$('width').addEventListener('change', () => schedule(true));
-$('invert').addEventListener('change', () => schedule());
+$('size').addEventListener('change', () => schedule(true));
+for (const t of toggles) {
+  $(t).addEventListener('change', () => {
+    refreshVisibility();
+    schedule();
+  });
+}
 $('export').addEventListener('click', exportStl);
 
-syncOutputs();
+applyMode('relief');
