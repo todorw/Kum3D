@@ -7,10 +7,14 @@ function smoothOutline(positions, count, edges) {
     links.get(p).push(q);
     links.get(q).push(p);
   }
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 12; pass++) {
+    const factor = pass % 2 ? -0.53 : 0.5;
     const next = new Map();
     for (const [v, [a, b]] of links) {
-      next.set(v, [0, 1].map((o) => positions[v * 3 + o] * 0.5 + (positions[a * 3 + o] + positions[b * 3 + o]) * 0.25));
+      next.set(v, [0, 1].map((o) => {
+        const p = positions[v * 3 + o];
+        return p + factor * ((positions[a * 3 + o] + positions[b * 3 + o]) / 2 - p);
+      }));
     }
     for (const [v, [x, y]] of next) {
       positions[v * 3] = positions[(count + v) * 3] = x;
