@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <clipPath id="cube">
+    <path d="M512 232 754 372V652L512 792 270 652V372Z"/>
+  </clipPath>
+  <rect width="1024" height="1024" rx="232" fill="#16181d"/>
+  <path d="M512 232 754 372 512 512 270 372Z" fill="#ffb48c"/>
+  <path d="M270 372 512 512V792L270 652Z" fill="#ff7a3d"/>
+  <path d="M754 372 512 512V792L754 652Z" fill="#c4501c"/>
+  <path d="M240 448 512 605 784 448M240 541 512 698 784 541" fill="none" stroke="#16181d" stroke-width="16" clip-path="url(#cube)"/>
+</svg>
