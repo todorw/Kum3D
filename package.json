@@ -7,11 +7,12 @@
   "author": "todorw",
   "license": "MIT",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "build": "esbuild src/app.js --bundle --format=esm --minify --outfile=build/app.js",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "build": {
     "appId": "com.kum3d.app",
@@ -19,10 +20,9 @@
     "files": [
       "main.js",
       "preload.js",
-      "src/**/*",
-      "node_modules/three/build/three.module.js",
-      "node_modules/three/build/three.core.js",
-      "node_modules/three/examples/jsm/controls/OrbitControls.js"
+      "src/index.html",
+      "src/styles.css",
+      "build/**/*"
     ],
     "win": {
       "target": "nsis"
