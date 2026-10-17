@@ -12,12 +12,12 @@ const toggles = ['cutout', 'invert', 'hollow'];
 const presets = {
   relief: { base: 2, depth: 4, border: 0, smoothing: 1, invert: false, cutout: true },
   lithophane: { base: 0.8, depth: 2.4, border: 3, smoothing: 0, invert: true, cutout: false },
-  vase: { smoothing: 2 }
+  round: { smoothing: 2 }
 };
 const hints = {
   relief: 'Raised picture. Bright areas stand tallest, the background gets cut away.',
   lithophane: 'Thin panel that reveals the photo when you hold it up to light.',
-  vase: 'Spins the outline around its centre. Use a straight side view of a vase, cup or bottle.'
+  round: 'For round things like bottles, vases, cups and glasses. Use a straight side-on photo.'
 };
 
 const viewer = new Viewer($('stage'));
@@ -30,7 +30,7 @@ const setStatus = (text) => {
 function params() {
   const p = Object.fromEntries(fields.map((f) => [f, Number($(f).value)]));
   for (const t of toggles) p[t] = $(t).checked;
-  p.cutout ||= state.mode === 'vase';
+  p.cutout ||= state.mode === 'round';
   return p;
 }
 
@@ -42,8 +42,8 @@ function refreshVisibility() {
   for (const el of document.querySelectorAll('[data-modes]')) {
     el.hidden = !el.dataset.modes.split(' ').includes(state.mode);
   }
-  $('toleranceField').hidden = state.mode !== 'vase' && !$('cutout').checked;
-  $('wallField').hidden = $('floorField').hidden = state.mode !== 'vase' || !$('hollow').checked;
+  $('toleranceField').hidden = state.mode !== 'round' && !$('cutout').checked;
+  $('wallField').hidden = $('floorField').hidden = state.mode !== 'round' || !$('hollow').checked;
 }
 
 function cropRegion({ x0, y0, x1, y1 }, sample) {
@@ -55,9 +55,10 @@ function cropRegion({ x0, y0, x1, y1 }, sample) {
 }
 
 function prepare({ resolution, cutout, tolerance }) {
-  const key = `${resolution}|${cutout}|${tolerance}`;
+  const solid = state.mode === 'round';
+  const key = `${resolution}|${cutout}|${tolerance}|${solid}`;
   if (state.prepared?.key === key) return state.prepared;
-  const options = { cutout, tolerance: tolerance / 100 };
+  const options = { cutout, tolerance: tolerance / 100, solid };
   let sample = sampleImage(state.image, resolution);
   let mask = buildMask(sample, options);
   const bounds = cutout && maskBounds(mask, sample.cols, sample.rows);
@@ -73,7 +74,7 @@ function build(p) {
   const { sample, mask } = prepare(p);
   const { cols, rows } = sample;
   const step = p.size / Math.max(cols, rows);
-  if (state.mode === 'vase') {
+  if (state.mode === 'round') {
     return buildRevolve(extractProfile(mask, cols, rows), {
       step,
       smoothing: p.smoothing,
