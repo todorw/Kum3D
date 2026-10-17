@@ -37,6 +37,13 @@ export function extractProfile(mask, cols, rows) {
   return radii;
 }
 
+function despeckle(values, radius) {
+  return values.map((_, i) => {
+    const window = values.slice(Math.max(0, i - radius), i + radius + 1).sort((a, b) => a - b);
+    return window[window.length >> 1];
+  });
+}
+
 function smooth(values, radius) {
   if (radius <= 0) return values;
   return values.map((_, i) => {
@@ -70,7 +77,7 @@ export function buildRevolve(radii, { step, smoothing, hollow, wall, floor }) {
   const last = rows.findLastIndex((r) => r > 0);
   if (first < 0 || last - first < 1) return null;
 
-  const profile = smooth(smooth(rows.slice(first, last + 1), smoothing), smoothing).map((r) => Math.max(r * step, MIN_RADIUS));
+  const profile = smooth(smooth(despeckle(rows.slice(first, last + 1), 3), smoothing), smoothing).map((r) => Math.max(r * step, MIN_RADIUS));
   const n = profile.length;
   const height = n * step;
   const dz = height / (n - 1);
