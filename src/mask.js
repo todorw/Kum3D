@@ -80,7 +80,7 @@ function floodBackground(mask, data, cols, rows, tolerance, edges) {
     if (i < mask.length - cols) visit(i + cols);
   }
   for (let i = 0; i < mask.length; i++) {
-    if (data[i * 4 + 3] < 128) mask[i] = 0;
+    if (data[i * 4 + 3] < 128 || (edges && similar(i))) mask[i] = 0;
   }
 }
 
@@ -160,35 +160,81 @@ function distanceTo(mask, cols, rows, target) {
   return dist;
 }
 
-function fillHoles(mask, cols, rows) {
-  const outside = new Uint8Array(mask.length);
+function enclosedRegions(mask, cols, rows) {
+  const seen = new Uint8Array(mask.length);
   const queue = new Int32Array(mask.length);
-  let head = 0;
-  let tail = 0;
-  const visit = (i) => {
-    if (!mask[i] && !outside[i]) {
-      outside[i] = 1;
-      queue[tail++] = i;
+  const flood = (start) => {
+    let head = 0;
+    let tail = 0;
+    seen[start] = 1;
+    queue[tail++] = start;
+    const box = { x0: cols, x1: -1, y0: rows, y1: -1, open: false };
+    while (head < tail) {
+      const i = queue[head++];
+      const c = i % cols;
+      const r = (i - c) / cols;
+      if (c === 0 || r === 0 || c === cols - 1 || r === rows - 1) box.open = true;
+      box.x0 = Math.min(box.x0, c);
+      box.x1 = Math.max(box.x1, c);
+      box.y0 = Math.min(box.y0, r);
+      box.y1 = Math.max(box.y1, r);
+      for (const j of [c > 0 ? i - 1 : -1, c < cols - 1 ? i + 1 : -1, i - cols, i + cols]) {
+        if (j >= 0 && j < mask.length && !mask[j] && !seen[j]) {
+          seen[j] = 1;
+          queue[tail++] = j;
+        }
+      }
     }
+    return { ...box, pixels: queue.slice(0, tail) };
   };
-  for (let c = 0; c < cols; c++) {
-    visit(c);
-    visit((rows - 1) * cols + c);
-  }
-  for (let r = 0; r < rows; r++) {
-    visit(r * cols);
-    visit(r * cols + cols - 1);
-  }
-  while (head < tail) {
-    const i = queue[head++];
-    const c = i % cols;
-    if (c > 0) visit(i - 1);
-    if (c < cols - 1) visit(i + 1);
-    if (i >= cols) visit(i - cols);
-    if (i < mask.length - cols) visit(i + cols);
-  }
+  const regions = [];
   for (let i = 0; i < mask.length; i++) {
-    if (!outside[i]) mask[i] = 1;
+    if (mask[i] || seen[i]) continue;
+    const region = flood(i);
+    if (!region.open) regions.push(region);
+  }
+  return regions;
+}
+
+function fillHoles(mask, cols, rows, centre) {
+  for (const hole of enclosedRegions(mask, cols, rows)) {
+    if (hole.x0 <= centre && centre <= hole.x1) for (const i of hole.pixels) mask[i] = 1;
+  }
+}
+
+function bodyRadius(mask, cols, rows, axis) {
+  const ac = Math.min(cols - 1, Math.floor(axis));
+  const widths = [];
+  for (let r = 0; r < rows; r++) {
+    const row = r * cols;
+    if (!mask[row + ac]) continue;
+    let left = ac;
+    let right = ac;
+    while (left > 0 && mask[row + left - 1]) left--;
+    while (right < cols - 1 && mask[row + right + 1]) right++;
+    widths.push((right - left + 1) / 2);
+  }
+  widths.sort((x, y) => x - y);
+  return widths.length ? widths[widths.length >> 1] : 0;
+}
+
+function removeHandles(mask, cols, rows) {
+  const axis = findAxis(mask, cols, rows);
+  if (axis === null) return;
+  const radius = bodyRadius(mask, cols, rows, axis);
+  for (const hole of enclosedRegions(mask, cols, rows)) {
+    const right = hole.x0 > axis;
+    const gap = right ? hole.x0 - axis : axis - hole.x1 - 1;
+    if (gap < radius * 0.7) continue;
+    const mid = ((hole.y0 + hole.y1) >> 1) * cols;
+    let thickness = 0;
+    for (let c = right ? hole.x1 + 1 : hole.x0 - 1; c >= 0 && c < cols && mask[mid + c]; c += right ? 1 : -1) thickness++;
+    const from = right ? hole.x0 : 0;
+    const to = right ? cols - 1 : hole.x1;
+    const pad = thickness + ((hole.y1 - hole.y0) >> 1) + 2;
+    for (let r = Math.max(0, hole.y0 - pad); r <= Math.min(rows - 1, hole.y1 + pad); r++) {
+      mask.fill(0, r * cols + from, r * cols + to + 1);
+    }
   }
 }
 
@@ -201,7 +247,8 @@ function solidify(mask, cols, rows) {
   for (let r = 0; r < rows; r++) padded.set(mask.subarray(r * cols, (r + 1) * cols), (r + pad) * pc + pad);
   const grown = distanceTo(padded, pc, pr, 1);
   for (let i = 0; i < padded.length; i++) padded[i] = grown[i] <= radius ? 1 : 0;
-  fillHoles(padded, pc, pr);
+  const bounds = maskBounds(padded, pc, pr);
+  if (bounds) fillHoles(padded, pc, pr, Math.round((bounds.x0 + bounds.x1) / 2));
   const shrunk = distanceTo(padded, pc, pr, 0);
   for (let i = 0; i < padded.length; i++) {
     if (shrunk[i] <= radius + 1) padded[i] = 0;
@@ -252,6 +299,7 @@ export function buildMask({ cols, rows, data }, { cutout, tolerance, solid }) {
   floodBackground(mask, data, cols, rows, tolerance, edges);
   if (solid) {
     solidify(mask, cols, rows);
+    removeHandles(mask, cols, rows);
     mirror(mask, cols, rows);
     solidify(mask, cols, rows);
   }
