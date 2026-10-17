@@ -17,11 +17,17 @@
   "build": {
     "appId": "com.kum3d.app",
     "productName": "Kum3D",
+    "directories": {
+      "buildResources": "assets"
+    },
+    "icon": "assets/icon.png",
     "files": [
       "main.js",
       "preload.js",
       "src/index.html",
       "src/styles.css",
+      "src/logo.svg",
+      "assets/icon.png",
       "build/**/*"
     ],
     "win": {
