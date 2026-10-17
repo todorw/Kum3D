@@ -1,3 +1,6 @@
+const MIN_RANGE = 0.25;
+const EDGE_RINGS = 2;
+
 function blurPass(from, to, cols, rows, radius, horizontal) {
   const len = horizontal ? cols : rows;
   const lines = horizontal ? rows : cols;
@@ -48,15 +51,57 @@ function insetDistance(mask, cols, rows) {
   return dist;
 }
 
-export function buildHeightmap({ cols, rows, luma }, mask, { invert, contrast, smoothing, border }) {
-  let min = Infinity;
-  let max = -Infinity;
+function settleEdges(luma, mask, cols, rows) {
+  const dist = insetDistance(mask, cols, rows);
+  const out = Float32Array.from(luma);
+  for (let ring = EDGE_RINGS; ring >= 1; ring--) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        if (dist[i] !== ring) continue;
+        let sum = 0;
+        let n = 0;
+        for (let nr = Math.max(0, r - 1); nr <= Math.min(rows - 1, r + 1); nr++) {
+          for (let nc = Math.max(0, c - 1); nc <= Math.min(cols - 1, c + 1); nc++) {
+            const j = nr * cols + nc;
+            if (dist[j] <= ring) continue;
+            sum += out[j];
+            n++;
+          }
+        }
+        if (n) out[i] = sum / n;
+      }
+    }
+  }
+  return out;
+}
+
+function lumaRange(luma, mask) {
+  const bins = new Uint32Array(256);
+  let total = 0;
   for (let i = 0; i < luma.length; i++) {
     if (!mask[i]) continue;
-    if (luma[i] < min) min = luma[i];
-    if (luma[i] > max) max = luma[i];
+    bins[Math.round(luma[i] * 255)]++;
+    total++;
   }
-  const range = max - min || 1;
+  const percentile = (p) => {
+    let seen = 0;
+    for (let b = 0; b < 256; b++) {
+      seen += bins[b];
+      if (seen >= total * p) return b / 255;
+    }
+    return 1;
+  };
+  const lo = percentile(0.02);
+  const hi = percentile(0.98);
+  const mid = (lo + hi) / 2;
+  const half = Math.max(hi - lo, MIN_RANGE) / 2;
+  return [mid - half, half * 2];
+}
+
+export function buildHeightmap({ cols, rows, luma: raw }, mask, { invert, contrast, smoothing, border }) {
+  const luma = settleEdges(raw, mask, cols, rows);
+  const [min, range] = lumaRange(luma, mask);
   let values = new Float32Array(luma.length);
   for (let i = 0; i < luma.length; i++) {
     const v = Math.min(1, Math.max(0, ((luma[i] - min) / range - 0.5) * contrast + 0.5));
