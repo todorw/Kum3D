@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-QHspYcLLOKSarKa9WCONpLgp80qJjPebMyusqjGSeoo='; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'">
+  <title>Kum3D</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">{"imports":{"three":"../node_modules/three/build/three.module.js","three/addons/":"../node_modules/three/examples/jsm/"}}</script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <aside class="panel">
+    <header class="brand">
+      <span class="logo">K</span>
+      <h1>Kum3D</h1>
+    </header>
+
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif" hidden>
+      <img id="thumb" alt="" hidden>
+      <span id="dropText">Drop an image, paste, or click to browse</span>
+    </label>
+
+    <div class="segmented" id="mode">
+      <button type="button" data-mode="relief" class="active">Relief</button>
+      <button type="button" data-mode="lithophane">Lithophane</button>
+    </div>
+
+    <div class="controls">
+      <label class="field">
+        <span>Width <output for="width"></output> mm</span>
+        <input type="range" id="width" min="20" max="300" step="1" value="100">
+      </label>
+      <label class="field">
+        <span>Base thickness <output for="base"></output> mm</span>
+        <input type="range" id="base" min="0.4" max="10" step="0.1" value="2">
+      </label>
+      <label class="field">
+        <span>Relief height <output for="depth"></output> mm</span>
+        <input type="range" id="depth" min="0.5" max="20" step="0.1" value="4">
+      </label>
+      <label class="field">
+        <span>Detail <output for="resolution"></output> px</span>
+        <input type="range" id="resolution" min="50" max="500" step="10" value="200">
+      </label>
+      <label class="field">
+        <span>Smoothing <output for="smoothing"></output></span>
+        <input type="range" id="smoothing" min="0" max="5" step="1" value="1">
+      </label>
+      <label class="field">
+        <span>Contrast <output for="contrast"></output></span>
+        <input type="range" id="contrast" min="0.5" max="3" step="0.1" value="1">
+      </label>
+      <label class="field">
+        <span>Border <output for="border"></output> mm</span>
+        <input type="range" id="border" min="0" max="10" step="0.5" value="0">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="invert">
+        <span>Invert (dark areas raised)</span>
+      </label>
+    </div>
+
+    <footer class="footer">
+      <dl class="stats">
+        <div><dt>Size</dt><dd id="statSize">–</dd></div>
+        <div><dt>Triangles</dt><dd id="statTris">–</dd></div>
+      </dl>
+      <button type="button" id="export" class="primary" disabled>Export STL</button>
+      <p class="status" id="status" role="status"></p>
+    </footer>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="empty" id="empty">Load a picture to generate a printable model</div>
+  </main>
+</body>
+</html>
