@@ -38,5 +38,12 @@
       ],
       "category": "Graphics"
     }
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
   }
 }
