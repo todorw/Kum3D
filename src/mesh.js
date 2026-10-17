@@ -23,6 +23,21 @@ function smoothOutline(positions, count, edges) {
   }
 }
 
+function centre(positions) {
+  const extent = [0, 1].map((o) => {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = o; i < positions.length; i += 3) {
+      if (positions[i] < min) min = positions[i];
+      if (positions[i] > max) max = positions[i];
+    }
+    const mid = (min + max) / 2;
+    for (let i = o; i < positions.length; i += 3) positions[i] -= mid;
+    return max - min;
+  });
+  return extent;
+}
+
 export function buildRelief({ cols, rows, values, mask }, { step, base, depth }) {
   const vcols = cols + 1;
   const vindex = new Int32Array(vcols * (rows + 1)).fill(-1);
@@ -110,5 +125,5 @@ export function buildRelief({ cols, rows, values, mask }, { step, base, depth })
   }
 
   smoothOutline(positions, count, edges);
-  return { positions, indices, size: [width, length, base + depth] };
+  return { positions, indices, size: [...centre(positions), base + depth] };
 }
