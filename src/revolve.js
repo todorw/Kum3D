@@ -1,28 +1,11 @@
+import { findAxis } from './mask.js';
+
 const SEGMENTS = 128;
 const MIN_RADIUS = 1;
 const MIN_HOLE = 0.4;
 
 export function extractProfile(mask, cols, rows) {
-  const mids = [];
-  for (let r = 0; r < rows; r++) {
-    let best = 0;
-    let mid = -1;
-    for (let c = 0; c < cols; ) {
-      if (!mask[r * cols + c]) {
-        c++;
-        continue;
-      }
-      const start = c;
-      while (c < cols && mask[r * cols + c]) c++;
-      if (c - start > best) {
-        best = c - start;
-        mid = (start + c) / 2;
-      }
-    }
-    if (mid >= 0) mids.push(mid);
-  }
-  mids.sort((a, b) => a - b);
-  const axis = Math.min(cols - 1, Math.floor(mids[mids.length >> 1] ?? 0));
+  const axis = Math.min(cols - 1, Math.floor(findAxis(mask, cols, rows) ?? 0));
 
   const radii = new Float32Array(rows);
   for (let r = 0; r < rows; r++) {
