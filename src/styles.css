@@ -91,7 +91,7 @@ body {
 
 .segmented {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   padding: 3px;
   border-radius: 10px;
   background: var(--bg);
@@ -110,6 +110,13 @@ body {
 .segmented button.active {
   background: var(--line);
   color: var(--text);
+}
+
+.hint {
+  min-height: 2.8em;
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .controls {
