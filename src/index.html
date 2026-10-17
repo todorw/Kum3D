@@ -21,22 +21,16 @@
     </label>
 
     <div class="segmented" id="mode">
-      <button type="button" data-mode="relief" class="active">Relief</button>
+      <button type="button" data-mode="relief">Relief</button>
       <button type="button" data-mode="lithophane">Lithophane</button>
+      <button type="button" data-mode="vase">Vase</button>
     </div>
+    <p class="hint" id="hint"></p>
 
     <div class="controls">
       <label class="field">
-        <span>Width <output for="width"></output> mm</span>
-        <input type="range" id="width" min="20" max="300" step="1" value="100">
-      </label>
-      <label class="field">
-        <span>Base thickness <output for="base"></output> mm</span>
-        <input type="range" id="base" min="0.4" max="10" step="0.1" value="2">
-      </label>
-      <label class="field">
-        <span>Relief height <output for="depth"></output> mm</span>
-        <input type="range" id="depth" min="0.5" max="20" step="0.1" value="4">
+        <span>Size <output for="size"></output> mm</span>
+        <input type="range" id="size" min="20" max="300" step="1" value="100">
       </label>
       <label class="field">
         <span>Detail <output for="resolution"></output> px</span>
@@ -46,17 +40,45 @@
         <span>Smoothing <output for="smoothing"></output></span>
         <input type="range" id="smoothing" min="0" max="5" step="1" value="1">
       </label>
-      <label class="field">
+      <label class="check" data-modes="relief lithophane">
+        <input type="checkbox" id="cutout" checked>
+        <span>Cut out background</span>
+      </label>
+      <label class="field" id="toleranceField">
+        <span>Background tolerance <output for="tolerance"></output>%</span>
+        <input type="range" id="tolerance" min="0" max="50" step="1" value="15">
+      </label>
+      <label class="field" data-modes="relief lithophane">
+        <span>Base thickness <output for="base"></output> mm</span>
+        <input type="range" id="base" min="0.4" max="10" step="0.1" value="2">
+      </label>
+      <label class="field" data-modes="relief lithophane">
+        <span>Relief height <output for="depth"></output> mm</span>
+        <input type="range" id="depth" min="0.5" max="20" step="0.1" value="4">
+      </label>
+      <label class="field" data-modes="relief lithophane">
         <span>Contrast <output for="contrast"></output></span>
         <input type="range" id="contrast" min="0.5" max="3" step="0.1" value="1">
       </label>
-      <label class="field">
+      <label class="field" data-modes="relief lithophane">
         <span>Border <output for="border"></output> mm</span>
         <input type="range" id="border" min="0" max="10" step="0.5" value="0">
       </label>
-      <label class="check">
+      <label class="check" data-modes="relief lithophane">
         <input type="checkbox" id="invert">
         <span>Invert (dark areas raised)</span>
+      </label>
+      <label class="check" data-modes="vase">
+        <input type="checkbox" id="hollow" checked>
+        <span>Hollow (holds water and flowers)</span>
+      </label>
+      <label class="field" id="wallField">
+        <span>Wall thickness <output for="wall"></output> mm</span>
+        <input type="range" id="wall" min="0.8" max="10" step="0.1" value="2">
+      </label>
+      <label class="field" id="floorField">
+        <span>Floor thickness <output for="floor"></output> mm</span>
+        <input type="range" id="floor" min="0.8" max="10" step="0.1" value="2">
       </label>
     </div>
 
