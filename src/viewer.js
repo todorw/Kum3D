@@ -74,7 +74,7 @@ export class Viewer {
     const radius = Math.hypot(w, l, h) / 2;
     const distance = radius / Math.sin(THREE.MathUtils.degToRad(this.camera.fov / 2));
     this.controls.target.set(0, 0, h / 2);
-    this.camera.position.set(0, -distance * 0.75, distance * 0.7);
+    this.camera.position.set(0, -distance * 0.85, h / 2 + distance * 0.5);
     this.camera.near = distance / 100;
     this.camera.far = distance * 20;
     this.camera.updateProjectionMatrix();
