@@ -122,6 +122,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  flex: 1 1 0;
+  min-height: 120px;
+  margin-right: -8px;
+  padding-right: 8px;
+  overflow-y: auto;
 }
 
 .field {
