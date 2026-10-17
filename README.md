@@ -34,4 +34,4 @@ Output goes to `dist/`. Build each platform on its own OS for best results (macO
 - Relief: bright areas end up raised. Tick invert for the opposite.
 - Cutout works best on PNGs with transparency or photos on a plain background. Raise the tolerance if background bits remain, lower it if the object gets eaten.
 - Lithophane: print upright with 100% infill and hold it against a light.
-- Vase: use a straight side-on photo. The widest part of each row becomes the radius, so handles are ignored.
+- Vase: use a straight side-on photo. Each row is measured through the centre line, so handles and gaps beside the body are ignored.
