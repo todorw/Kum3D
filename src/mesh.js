@@ -1,3 +1,24 @@
+function smoothOutline(positions, count, edges) {
+  const links = new Map();
+  for (let i = 0; i < edges.length; i += 2) {
+    const [p, q] = [edges[i], edges[i + 1]];
+    if (!links.has(p)) links.set(p, []);
+    if (!links.has(q)) links.set(q, []);
+    links.get(p).push(q);
+    links.get(q).push(p);
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Map();
+    for (const [v, [a, b]] of links) {
+      next.set(v, [0, 1].map((o) => positions[v * 3 + o] * 0.5 + (positions[a * 3 + o] + positions[b * 3 + o]) * 0.25));
+    }
+    for (const [v, [x, y]] of next) {
+      positions[v * 3] = positions[(count + v) * 3] = x;
+      positions[v * 3 + 1] = positions[(count + v) * 3 + 1] = y;
+    }
+  }
+}
+
 export function buildRelief({ cols, rows, values, mask }, { step, base, depth }) {
   const vcols = cols + 1;
   const vindex = new Int32Array(vcols * (rows + 1)).fill(-1);
@@ -51,13 +72,17 @@ export function buildRelief({ cols, rows, values, mask }, { step, base, depth })
   }
 
   const indices = new Uint32Array((quads * 4 + walls * 2) * 3);
+  const edges = new Uint32Array(walls * 2);
   let k = 0;
+  let ec = 0;
   const tri = (a, b, c) => {
     indices[k++] = a;
     indices[k++] = b;
     indices[k++] = c;
   };
   const wall = (p, q) => {
+    edges[ec++] = p;
+    edges[ec++] = q;
     tri(q, p, count + p);
     tri(q, count + p, count + q);
   };
@@ -80,5 +105,6 @@ export function buildRelief({ cols, rows, values, mask }, { step, base, depth })
     }
   }
 
+  smoothOutline(positions, count, edges);
   return { positions, indices, size: [width, length, base + depth] };
 }
