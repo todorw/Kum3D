@@ -48,10 +48,11 @@ function refreshVisibility() {
 
 function cropRegion({ x0, y0, x1, y1 }, sample) {
   const s = 1 / sample.scale;
+  const pad = Math.max(2, Math.round(Math.max(sample.cols, sample.rows) * 0.03));
   const { width, height } = state.image;
-  const x = Math.max(0, (x0 - 1) * s);
-  const y = Math.max(0, (y0 - 1) * s);
-  return { x, y, w: Math.min(width, (x1 + 2) * s) - x, h: Math.min(height, (y1 + 2) * s) - y };
+  const x = Math.max(0, (x0 - pad) * s);
+  const y = Math.max(0, (y0 - pad) * s);
+  return { x, y, w: Math.min(width, (x1 + 1 + pad) * s) - x, h: Math.min(height, (y1 + 1 + pad) * s) - y };
 }
 
 function prepare({ resolution, cutout, tolerance }) {
@@ -73,7 +74,9 @@ function prepare({ resolution, cutout, tolerance }) {
 function build(p) {
   const { sample, mask } = prepare(p);
   const { cols, rows } = sample;
-  const step = p.size / Math.max(cols, rows);
+  const bounds = maskBounds(mask, cols, rows);
+  if (!bounds) return null;
+  const step = p.size / Math.max(bounds.x1 - bounds.x0 + 1, bounds.y1 - bounds.y0 + 1);
   if (state.mode === 'round') {
     return buildRevolve(extractProfile(mask, cols, rows), {
       step,
