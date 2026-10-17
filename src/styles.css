@@ -59,14 +59,8 @@ body {
 }
 
 .logo {
-  display: grid;
-  place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 800;
 }
 
 .drop {
