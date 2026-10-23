@@ -10,6 +10,8 @@ import { findObject } from './segment.js';
 const $ = (id) => document.getElementById(id);
 const fields = ['size', 'resolution', 'smoothing', 'tolerance', 'base', 'depth', 'contrast', 'border', 'tilt', 'detail', 'wall', 'floor'];
 const toggles = ['cutout', 'invert', 'hollow'];
+const transient = ['tilt', 'hollow'];
+const SETTINGS_KEY = 'kum3d:settings';
 const presets = {
   relief: { base: 2, depth: 4, border: 0, smoothing: 1, invert: false, cutout: true },
   lithophane: { base: 0.8, depth: 2.4, border: 3, smoothing: 0, invert: true, cutout: false },
@@ -152,8 +154,39 @@ function rebuild(refit = false) {
   $('statTris').textContent = (state.mesh.indices.length / 3).toLocaleString();
 }
 
+function saveSettings() {
+  const settings = { mode: state.mode, method: $('method').value };
+  for (const f of fields) if (!transient.includes(f)) settings[f] = $(f).value;
+  for (const t of toggles) if (!transient.includes(t)) settings[t] = $(t).checked;
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {}
+}
+
+function loadSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function restoreSettings() {
+  const settings = loadSettings();
+  applyMode(presets[settings.mode] ? settings.mode : 'relief');
+  for (const [key, value] of Object.entries(settings)) {
+    const input = $(key);
+    if (!input || key === 'mode') continue;
+    if (typeof value === 'boolean') input.checked = value;
+    else input.value = value;
+  }
+  refreshVisibility();
+  syncOutputs();
+}
+
 function schedule(refit = false) {
   syncOutputs();
+  saveSettings();
   cancelAnimationFrame(state.frame);
   state.refit ||= refit;
   state.frame = requestAnimationFrame(flush);
@@ -290,4 +323,16 @@ $('method').addEventListener('change', () => {
 });
 $('export').addEventListener('click', exportStl);
 
-applyMode('relief');
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const key = e.key.toLowerCase();
+  if (key === 'o') {
+    e.preventDefault();
+    $('file').click();
+  } else if (key === 's') {
+    e.preventDefault();
+    if (!$('export').disabled) exportStl();
+  }
+});
+
+restoreSettings();
