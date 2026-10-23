@@ -63,7 +63,8 @@ function capHeight(edge) {
     error = Math.sqrt(error / h) / radius;
     if (error < best.error) best = { height: h, error, radius };
   }
-  return best.error < 0.08 ? (Math.asin(best.height / best.radius) * 180) / Math.PI : 0;
+  if (best.error >= 0.08 || edge[0] > best.radius * 0.4) return 0;
+  return (Math.asin(best.height / best.radius) * 180) / Math.PI;
 }
 
 export function estimateTilt(radii) {
@@ -81,7 +82,7 @@ export function opensWide(radii) {
   if (!profile) return true;
   const values = smooth(profile.values, 2);
   const mouth = Math.max(...values.slice(0, Math.max(1, Math.round(values.length * 0.05))));
-  return mouth >= Math.max(...values) * 0.45;
+  return mouth >= Math.max(...values) * 0.6;
 }
 
 function erode(profile, dz, wall, from) {
@@ -98,7 +99,8 @@ function erode(profile, dz, wall, from) {
   return inner;
 }
 
-function detailField({ luma, mask, cols, rows }, width) {
+function detailField({ luma: raw, mask, cols, rows }, width) {
+  const luma = maskedBlur(raw, mask, cols, rows, 1);
   const blurred = maskedBlur(luma, mask, cols, rows, Math.max(2, Math.round(width * 0.08)));
   const field = new Float32Array(luma.length);
   const magnitudes = [];
