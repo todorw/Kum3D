@@ -35,17 +35,30 @@ ipcMain.handle('asset:read', async (event, name) => {
   return new Uint8Array(await fs.readFile(assets[name]));
 });
 
-ipcMain.handle('stl:save', async (event, { name, data }) => {
-  if (!(data instanceof Uint8Array)) throw new Error('Invalid STL data');
+let pendingExport = null;
+
+ipcMain.handle('export:choose', async (event, name) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const safeName = String(name || 'model').replace(/[^\p{L}\p{N}_\- ]+/gu, '').trim().slice(0, 100) || 'model';
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
-    title: 'Export STL',
+    title: 'Export model',
     defaultPath: `${safeName}.stl`,
-    filters: [{ name: 'STL', extensions: ['stl'] }]
+    filters: [
+      { name: 'STL', extensions: ['stl'] },
+      { name: '3MF', extensions: ['3mf'] }
+    ]
   });
   if (canceled || !filePath) return null;
-  const target = filePath.toLowerCase().endsWith('.stl') ? filePath : `${filePath}.stl`;
+  const extension = path.extname(filePath).toLowerCase();
+  const format = extension === '.3mf' ? '3mf' : 'stl';
+  pendingExport = extension === '.3mf' || extension === '.stl' ? filePath : `${filePath}.stl`;
+  return { path: pendingExport, format };
+});
+
+ipcMain.handle('export:write', async (event, data) => {
+  if (!pendingExport || !(data instanceof Uint8Array)) throw new Error('Nothing to export');
+  const target = pendingExport;
+  pendingExport = null;
   await fs.writeFile(target, data);
   return target;
 });
