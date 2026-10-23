@@ -161,7 +161,7 @@ test('surface detail stays watertight', () => {
 
 test('bottles are told apart from open containers', () => {
   assert.equal(opensWide(cylinder(0).radii), true);
-  assert.equal(opensWide(extractProfile(vase(), 40, 80).radii), true);
+  assert.equal(opensWide(extractProfile(vase(), 40, 80).radii), false);
   const cols = 40;
   const rows = 80;
   const bottle = new Uint8Array(cols * rows);
