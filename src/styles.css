@@ -142,6 +142,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+select {
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
 input[type="range"] {
   width: 100%;
   accent-color: var(--accent);
