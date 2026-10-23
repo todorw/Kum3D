@@ -214,38 +214,79 @@ function fillHoles(mask, cols, rows, centre) {
   }
 }
 
-function bodyRadius(mask, cols, rows, axis) {
-  const ac = Math.min(cols - 1, Math.floor(axis));
-  const widths = [];
-  for (let r = 0; r < rows; r++) {
-    const row = r * cols;
-    if (!mask[row + ac]) continue;
-    let left = ac;
-    let right = ac;
-    while (left > 0 && mask[row + left - 1]) left--;
-    while (right < cols - 1 && mask[row + right + 1]) right++;
-    widths.push((right - left + 1) / 2);
+function openWindow(mask, cols, rows, box, radius) {
+  const x0 = Math.max(0, box.x0 - radius - 1);
+  const y0 = Math.max(0, box.y0 - radius - 1);
+  const x1 = Math.min(cols - 1, box.x1 + radius + 1);
+  const y1 = Math.min(rows - 1, box.y1 + radius + 1);
+  const wc = x1 - x0 + 1;
+  const wr = y1 - y0 + 1;
+  const local = new Uint8Array(wc * wr);
+  for (let r = 0; r < wr; r++) local.set(mask.subarray((y0 + r) * cols + x0, (y0 + r) * cols + x1 + 1), r * wc);
+  const eroded = distanceTo(local, wc, wr, 0).map((d) => (d > radius ? 1 : 0));
+  const reach = distanceTo(eroded, wc, wr, 1);
+  for (let r = box.y0; r <= box.y1; r++) {
+    for (let c = box.x0; c <= box.x1; c++) {
+      if (reach[(r - y0) * wc + c - x0] > radius) mask[r * cols + c] = 0;
+    }
   }
-  widths.sort((x, y) => x - y);
-  return widths.length ? widths[widths.length >> 1] : 0;
 }
 
 function removeHandles(mask, cols, rows) {
   const axis = findAxis(mask, cols, rows);
   if (axis === null) return;
-  const radius = bodyRadius(mask, cols, rows, axis);
   for (const hole of enclosedRegions(mask, cols, rows)) {
+    if (hole.x0 <= axis && axis <= hole.x1 + 1) continue;
     const right = hole.x0 > axis;
-    const gap = right ? hole.x0 - axis : axis - hole.x1 - 1;
-    if (gap < radius * 0.7) continue;
     const mid = ((hole.y0 + hole.y1) >> 1) * cols;
     let thickness = 0;
     for (let c = right ? hole.x1 + 1 : hole.x0 - 1; c >= 0 && c < cols && mask[mid + c]; c += right ? 1 : -1) thickness++;
-    const from = right ? hole.x0 : 0;
-    const to = right ? cols - 1 : hole.x1;
-    const pad = thickness + ((hole.y1 - hole.y0) >> 1) + 2;
-    for (let r = Math.max(0, hole.y0 - pad); r <= Math.min(rows - 1, hole.y1 + pad); r++) {
-      mask.fill(0, r * cols + from, r * cols + to + 1);
+    const pad = thickness + 2;
+    const box = {
+      x0: right ? hole.x0 : Math.max(0, hole.x0 - pad),
+      x1: right ? Math.min(cols - 1, hole.x1 + pad) : hole.x1,
+      y0: Math.max(0, hole.y0 - pad),
+      y1: Math.min(rows - 1, hole.y1 + pad)
+    };
+    openWindow(mask, cols, rows, box, Math.ceil(thickness / 2) + 1);
+    for (const i of hole.pixels) mask[i] = 0;
+  }
+}
+
+function runningMedian(values, radius) {
+  return values.map((_, i) => {
+    const window = values.slice(Math.max(0, i - radius), i + radius + 1).filter((v) => v >= 0).sort((x, y) => x - y);
+    return window.length ? window[window.length >> 1] : -1;
+  });
+}
+
+function removeBumps(mask, cols, rows) {
+  const axis = findAxis(mask, cols, rows);
+  if (axis === null) return;
+  const ac = Math.min(cols - 1, Math.floor(axis));
+  const left = new Array(rows).fill(-1);
+  const right = new Array(rows).fill(-1);
+  for (let r = 0; r < rows; r++) {
+    const row = r * cols;
+    if (!mask[row + ac]) continue;
+    let l = ac;
+    let h = ac;
+    while (l > 0 && mask[row + l - 1]) l--;
+    while (h < cols - 1 && mask[row + h + 1]) h++;
+    left[r] = ac - l;
+    right[r] = h - ac;
+  }
+  const reaches = [...left, ...right].filter((v) => v >= 0).sort((x, y) => x - y);
+  if (!reaches.length) return;
+  const threshold = Math.max(2, reaches[reaches.length >> 1] * 0.06);
+  const window = Math.max(3, Math.round(rows * 0.15));
+  const trends = [runningMedian(left, window), runningMedian(right, window)];
+  for (let r = 0; r < rows; r++) {
+    if (left[r] < 0) continue;
+    for (const [side, own, other, trend] of [[-1, left[r], right[r], trends[0][r]], [1, right[r], left[r], trends[1][r]]]) {
+      if (own - trend <= threshold || own - other <= threshold) continue;
+      const keep = Math.max(other, trend);
+      for (let k = keep + 1; k <= own; k++) mask[r * cols + ac + side * k] = 0;
     }
   }
 }
@@ -317,6 +358,8 @@ export function buildMask({ cols, rows, data, matte }, { cutout, tolerance, soli
     if (matte) keepLargest(mask, cols);
     solidify(mask, cols, rows);
     removeHandles(mask, cols, rows);
+    removeBumps(mask, cols, rows);
+    keepLargest(mask, cols);
     mirror(mask, cols, rows);
     solidify(mask, cols, rows);
   }
