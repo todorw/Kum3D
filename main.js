@@ -25,6 +25,16 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
 }
 
+const assets = {
+  model: path.join(__dirname, 'assets', 'models', 'u2netp.onnx'),
+  runtime: path.join(__dirname, 'build', 'ort.wasm')
+};
+
+ipcMain.handle('asset:read', async (event, name) => {
+  if (!Object.hasOwn(assets, name)) throw new Error('Unknown asset');
+  return new Uint8Array(await fs.readFile(assets[name]));
+});
+
 ipcMain.handle('stl:save', async (event, { name, data }) => {
   if (!(data instanceof Uint8Array)) throw new Error('Invalid STL data');
   const win = BrowserWindow.fromWebContents(event.sender);
