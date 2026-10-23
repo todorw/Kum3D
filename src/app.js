@@ -5,6 +5,7 @@ import { buildHeightmap } from './heightmap.js';
 import { buildRelief } from './mesh.js';
 import { extractProfile, buildRevolve, estimateTilt, opensWide } from './revolve.js';
 import { toBinaryStl } from './stl.js';
+import { toThreeMf } from './threemf.js';
 import { findObject } from './segment.js';
 
 const $ = (id) => document.getElementById(id);
@@ -265,18 +266,20 @@ function applyMode(mode) {
   schedule(true);
 }
 
-async function exportStl() {
+async function exportModel() {
   flush();
   if (!state.mesh) return;
   $('export').disabled = true;
-  setStatus('Exporting…');
   try {
-    const saved = await window.kum3d.saveStl(state.name, toBinaryStl(state.mesh));
-    setStatus(saved ? `Saved to ${saved}` : '');
+    const choice = await window.kum3d.chooseExport(state.name);
+    if (!choice) return;
+    setStatus('Exporting…');
+    const data = choice.format === '3mf' ? toThreeMf(state.mesh, state.name) : toBinaryStl(state.mesh);
+    setStatus(`Saved to ${await window.kum3d.writeExport(data)}`);
   } catch (err) {
     setStatus(`Export failed: ${err.message}`);
   } finally {
-    $('export').disabled = false;
+    $('export').disabled = !state.mesh;
   }
 }
 
@@ -321,7 +324,7 @@ $('method').addEventListener('change', () => {
   refreshVisibility();
   schedule();
 });
-$('export').addEventListener('click', exportStl);
+$('export').addEventListener('click', exportModel);
 
 window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
@@ -331,7 +334,7 @@ window.addEventListener('keydown', (e) => {
     $('file').click();
   } else if (key === 's') {
     e.preventDefault();
-    if (!$('export').disabled) exportStl();
+    if (!$('export').disabled) exportModel();
   }
 });
 
