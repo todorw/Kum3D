@@ -21,7 +21,7 @@ const hints = {
 };
 
 const viewer = new Viewer($('stage'));
-const state = { mode: 'relief', image: null, thumbUrl: null, name: 'model', prepared: null, mesh: null, frame: 0 };
+const state = { mode: 'relief', image: null, thumbUrl: null, name: 'model', prepared: null, mesh: null, frame: 0, refit: false };
 
 const setStatus = (text) => {
   $('status').textContent = text;
@@ -125,7 +125,15 @@ function rebuild(refit = false) {
 function schedule(refit = false) {
   syncOutputs();
   cancelAnimationFrame(state.frame);
-  state.frame = requestAnimationFrame(() => rebuild(refit));
+  state.refit ||= refit;
+  state.frame = requestAnimationFrame(flush);
+}
+
+function flush() {
+  cancelAnimationFrame(state.frame);
+  const refit = state.refit;
+  state.refit = false;
+  rebuild(refit);
 }
 
 async function loadFile(file) {
@@ -163,6 +171,7 @@ function applyMode(mode) {
 }
 
 async function exportStl() {
+  flush();
   if (!state.mesh) return;
   $('export').disabled = true;
   setStatus('Exporting…');
