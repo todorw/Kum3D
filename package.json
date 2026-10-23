@@ -50,6 +50,7 @@
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
+    "onnxruntime-web": "^1.30.0",
     "three": "^0.186.1"
   },
   "allowScripts": {
