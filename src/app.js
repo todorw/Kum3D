@@ -3,17 +3,17 @@ import { sampleImage } from './image.js';
 import { buildMask, maskBounds } from './mask.js';
 import { buildHeightmap } from './heightmap.js';
 import { buildRelief } from './mesh.js';
-import { extractProfile, buildRevolve } from './revolve.js';
+import { extractProfile, buildRevolve, estimateTilt, opensWide } from './revolve.js';
 import { toBinaryStl } from './stl.js';
 import { findObject } from './segment.js';
 
 const $ = (id) => document.getElementById(id);
-const fields = ['size', 'resolution', 'smoothing', 'tolerance', 'base', 'depth', 'contrast', 'border', 'wall', 'floor'];
+const fields = ['size', 'resolution', 'smoothing', 'tolerance', 'base', 'depth', 'contrast', 'border', 'tilt', 'detail', 'wall', 'floor'];
 const toggles = ['cutout', 'invert', 'hollow'];
 const presets = {
   relief: { base: 2, depth: 4, border: 0, smoothing: 1, invert: false, cutout: true },
   lithophane: { base: 0.8, depth: 2.4, border: 3, smoothing: 0, invert: true, cutout: false },
-  round: { smoothing: 2 }
+  round: { smoothing: 2, invert: false }
 };
 const hints = {
   relief: 'Raised picture. Bright areas stand tallest, the background gets cut away.',
@@ -22,7 +22,7 @@ const hints = {
 };
 
 const viewer = new Viewer($('stage'));
-const state = { mode: 'relief', image: null, thumbUrl: null, name: 'model', prepared: null, mesh: null, frame: 0, refit: false, matte: null, notice: '' };
+const state = { mode: 'relief', image: null, thumbUrl: null, name: 'model', prepared: null, mesh: null, frame: 0, refit: false, matte: null, notice: '', suggest: false, hollowTouched: false };
 
 const setStatus = (text) => {
   $('status').textContent = text;
@@ -85,21 +85,29 @@ function prepare({ resolution, cutout, tolerance, method }) {
   return state.prepared;
 }
 
+function suggest({ radii }, p) {
+  state.suggest = false;
+  p.tilt = estimateTilt(radii);
+  $('tilt').value = p.tilt;
+  if (!state.hollowTouched) {
+    p.hollow = opensWide(radii);
+    $('hollow').checked = p.hollow;
+  }
+  syncOutputs();
+  refreshVisibility();
+}
+
 function build(p) {
   const { sample, mask } = prepare(p);
   const { cols, rows } = sample;
   const bounds = maskBounds(mask, cols, rows);
   if (!bounds) return null;
-  const step = p.size / Math.max(bounds.x1 - bounds.x0 + 1, bounds.y1 - bounds.y0 + 1);
   if (state.mode === 'round') {
-    return buildRevolve(extractProfile(mask, cols, rows), {
-      step,
-      smoothing: p.smoothing,
-      hollow: p.hollow,
-      wall: p.wall,
-      floor: p.floor
-    });
+    const profile = extractProfile(mask, cols, rows);
+    if (state.suggest) suggest(profile, p);
+    return buildRevolve(profile, p, { luma: sample.luma, mask, cols, rows });
   }
+  const step = p.size / Math.max(bounds.x1 - bounds.x0 + 1, bounds.y1 - bounds.y0 + 1);
   const values = buildHeightmap(sample, mask, {
     invert: p.invert,
     contrast: p.contrast,
@@ -196,6 +204,7 @@ async function loadFile(file) {
   state.prepared = null;
   state.matte = undefined;
   state.notice = '';
+  state.suggest = true;
   detectObject(image);
   state.name = file.name.replace(/\.[^.]+$/, '') || 'model';
   if (state.thumbUrl) URL.revokeObjectURL(state.thumbUrl);
@@ -210,6 +219,7 @@ async function loadFile(file) {
 
 function applyMode(mode) {
   state.mode = mode;
+  state.suggest = mode === 'round';
   for (const btn of $('mode').querySelectorAll('button')) {
     btn.classList.toggle('active', btn.dataset.mode === mode);
   }
@@ -271,6 +281,9 @@ for (const t of toggles) {
     schedule();
   });
 }
+$('hollow').addEventListener('change', () => {
+  state.hollowTouched = true;
+});
 $('method').addEventListener('change', () => {
   refreshVisibility();
   schedule();
