@@ -9,6 +9,7 @@
   "scripts": {
     "build": "esbuild src/app.js --bundle --format=esm --minify --outfile=build/app.js",
     "start": "npm run build && electron .",
+    "test": "node --test test/*.test.mjs",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
