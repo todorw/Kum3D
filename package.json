@@ -7,7 +7,7 @@
   "author": "todorw",
   "license": "MIT",
   "scripts": {
-    "build": "esbuild src/app.js --bundle --format=esm --minify --outfile=build/app.js",
+    "build": "node scripts/build.mjs",
     "start": "npm run build && electron .",
     "test": "node --test test/*.test.mjs",
     "dist": "npm run build && electron-builder",
@@ -29,6 +29,7 @@
       "src/styles.css",
       "src/logo.svg",
       "assets/icon.png",
+      "assets/models/u2netp.onnx",
       "build/**/*"
     ],
     "win": {
