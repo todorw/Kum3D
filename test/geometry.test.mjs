@@ -5,6 +5,8 @@ import { buildHeightmap } from '../src/heightmap.js';
 import { buildRelief } from '../src/mesh.js';
 import { extractProfile, buildRevolve, estimateTilt, opensWide } from '../src/revolve.js';
 import { toBinaryStl } from '../src/stl.js';
+import { toThreeMf } from '../src/threemf.js';
+import { crc32 } from 'node:zlib';
 
 function inspect({ positions, indices }) {
   const edges = new Map();
@@ -170,4 +172,32 @@ test('bottles are told apart from open containers', () => {
     for (let c = 0; c < cols; c++) if (Math.abs(c + 0.5 - cols / 2) < w) bottle[r * cols + c] = 1;
   }
   assert.equal(opensWide(extractProfile(bottle, cols, rows).radii), false);
+});
+
+test('3mf is a valid zip with the mesh inside', () => {
+  const mesh = buildRevolve(extractProfile(vase(), 40, 80), { size: 80, smoothing: 1, hollow: true, wall: 2, floor: 2 });
+  const bytes = toThreeMf(mesh, 'test');
+  const view = new DataView(bytes.buffer);
+  const end = bytes.length - 22;
+  assert.equal(view.getUint32(end, true), 0x06054b50);
+  const count = view.getUint16(end + 10, true);
+  let o = view.getUint32(end + 16, true);
+  const names = [];
+  for (let i = 0; i < count; i++) {
+    assert.equal(view.getUint32(o, true), 0x02014b50);
+    const size = view.getUint32(o + 24, true);
+    const nameLength = view.getUint16(o + 28, true);
+    const local = view.getUint32(o + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(o + 46, o + 46 + nameLength));
+    const start = local + 30 + view.getUint16(local + 26, true);
+    const data = bytes.subarray(start, start + size);
+    assert.equal(view.getUint32(o + 16, true), crc32(data));
+    if (name === '3D/3dmodel.model') {
+      const xml = new TextDecoder().decode(data);
+      assert.equal((xml.match(/<triangle /g) ?? []).length, mesh.indices.length / 3);
+    }
+    names.push(name);
+    o += 46 + nameLength;
+  }
+  assert.deepEqual(names, ['[Content_Types].xml', '_rels/.rels', '3D/3dmodel.model']);
 });
