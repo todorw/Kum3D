@@ -14,7 +14,7 @@ function blurPass(from, to, cols, rows, radius, horizontal) {
   }
 }
 
-function maskedBlur(values, mask, cols, rows, radius) {
+export function maskedBlur(values, mask, cols, rows, radius) {
   const n = values.length;
   const weighted = new Float32Array(n);
   const weights = new Float32Array(n);
