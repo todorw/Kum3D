@@ -28,7 +28,7 @@ function createWindow() {
 ipcMain.handle('stl:save', async (event, { name, data }) => {
   if (!(data instanceof Uint8Array)) throw new Error('Invalid STL data');
   const win = BrowserWindow.fromWebContents(event.sender);
-  const safeName = String(name || 'model').replace(/[^\w\- ]+/g, '').trim() || 'model';
+  const safeName = String(name || 'model').replace(/[^\p{L}\p{N}_\- ]+/gu, '').trim().slice(0, 100) || 'model';
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     title: 'Export STL',
     defaultPath: `${safeName}.stl`,
