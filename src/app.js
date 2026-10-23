@@ -106,7 +106,15 @@ function build(p) {
 
 function rebuild(refit = false) {
   if (!state.image) return;
-  state.mesh = build(params());
+  try {
+    state.mesh = build(params());
+  } catch (err) {
+    console.error(err);
+    state.mesh = null;
+    $('export').disabled = true;
+    setStatus(`Could not build the model: ${err.message}`);
+    return;
+  }
   $('export').disabled = !state.mesh;
   if (!state.mesh) {
     viewer.clear();
@@ -138,22 +146,24 @@ function flush() {
 
 async function loadFile(file) {
   if (!file?.type.startsWith('image/')) return setStatus('That file is not an image');
+  let image;
   try {
-    const image = await createImageBitmap(file);
-    state.image?.close();
-    state.image = image;
-    state.prepared = null;
-    state.name = file.name.replace(/\.[^.]+$/, '') || 'model';
-    if (state.thumbUrl) URL.revokeObjectURL(state.thumbUrl);
-    state.thumbUrl = URL.createObjectURL(file);
-    $('thumb').src = state.thumbUrl;
-    $('thumb').hidden = false;
-    $('dropText').hidden = true;
-    $('empty').hidden = true;
-    rebuild(true);
+    image = await createImageBitmap(file);
   } catch {
-    setStatus('Could not read that image');
+    return setStatus('Could not read that image');
   }
+  state.image?.close();
+  state.image = image;
+  state.prepared = null;
+  state.name = file.name.replace(/\.[^.]+$/, '') || 'model';
+  if (state.thumbUrl) URL.revokeObjectURL(state.thumbUrl);
+  state.thumbUrl = URL.createObjectURL(file);
+  $('thumb').src = state.thumbUrl;
+  $('thumb').hidden = false;
+  $('dropText').hidden = true;
+  $('empty').hidden = true;
+  schedule(true);
+  flush();
 }
 
 function applyMode(mode) {
