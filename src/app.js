@@ -5,6 +5,7 @@ import { buildHeightmap } from './heightmap.js';
 import { buildRelief } from './mesh.js';
 import { extractProfile, buildRevolve } from './revolve.js';
 import { toBinaryStl } from './stl.js';
+import { findObject } from './segment.js';
 
 const $ = (id) => document.getElementById(id);
 const fields = ['size', 'resolution', 'smoothing', 'tolerance', 'base', 'depth', 'contrast', 'border', 'wall', 'floor'];
@@ -21,7 +22,7 @@ const hints = {
 };
 
 const viewer = new Viewer($('stage'));
-const state = { mode: 'relief', image: null, thumbUrl: null, name: 'model', prepared: null, mesh: null, frame: 0, refit: false };
+const state = { mode: 'relief', image: null, thumbUrl: null, name: 'model', prepared: null, mesh: null, frame: 0, refit: false, matte: null, notice: '' };
 
 const setStatus = (text) => {
   $('status').textContent = text;
@@ -31,6 +32,7 @@ function params() {
   const p = Object.fromEntries(fields.map((f) => [f, Number($(f).value)]));
   for (const t of toggles) p[t] = $(t).checked;
   p.cutout ||= state.mode === 'round';
+  p.method = $('method').value;
   return p;
 }
 
@@ -42,7 +44,9 @@ function refreshVisibility() {
   for (const el of document.querySelectorAll('[data-modes]')) {
     el.hidden = !el.dataset.modes.split(' ').includes(state.mode);
   }
-  $('toleranceField').hidden = state.mode !== 'round' && !$('cutout').checked;
+  const cutting = state.mode === 'round' || $('cutout').checked;
+  $('methodField').hidden = !cutting;
+  $('toleranceField').hidden = !cutting || $('method').value !== 'colour';
   $('wallField').hidden = $('floorField').hidden = state.mode !== 'round' || !$('hollow').checked;
 }
 
@@ -55,12 +59,13 @@ function cropRegion({ x0, y0, x1, y1 }, sample) {
   return { x, y, w: Math.min(width, (x1 + 1 + pad) * s) - x, h: Math.min(height, (y1 + 1 + pad) * s) - y };
 }
 
-function prepare({ resolution, cutout, tolerance }) {
+function prepare({ resolution, cutout, tolerance, method }) {
   const solid = state.mode === 'round';
-  const key = `${resolution}|${cutout}|${tolerance}|${solid}`;
+  const matte = cutout && method === 'smart' ? state.matte : null;
+  const key = `${resolution}|${cutout}|${tolerance}|${solid}|${Boolean(matte)}`;
   if (state.prepared?.key === key) return state.prepared;
   const options = { cutout, tolerance: tolerance / 100, solid };
-  let sample = sampleImage(state.image, resolution);
+  let sample = sampleImage(state.image, resolution, undefined, matte);
   let mask = buildMask(sample, options);
   let bounds = cutout && maskBounds(mask, sample.cols, sample.rows);
   if (bounds && solid) {
@@ -73,7 +78,7 @@ function prepare({ resolution, cutout, tolerance }) {
     };
   }
   if (bounds) {
-    sample = sampleImage(state.image, resolution, cropRegion(bounds, sample));
+    sample = sampleImage(state.image, resolution, cropRegion(bounds, sample), matte);
     mask = buildMask(sample, options);
   }
   state.prepared = { key, sample, mask };
@@ -106,8 +111,17 @@ function build(p) {
 
 function rebuild(refit = false) {
   if (!state.image) return;
+  const p = params();
+  if (p.cutout && p.method === 'smart' && state.matte === undefined) {
+    state.mesh = null;
+    viewer.clear();
+    $('export').disabled = true;
+    $('statSize').textContent = $('statTris').textContent = '–';
+    setStatus('Finding the object…');
+    return;
+  }
   try {
-    state.mesh = build(params());
+    state.mesh = build(p);
   } catch (err) {
     console.error(err);
     state.mesh = null;
@@ -122,7 +136,7 @@ function rebuild(refit = false) {
     setStatus('Nothing left after cutting out the background. Try a lower tolerance.');
     return;
   }
-  setStatus('');
+  setStatus(state.notice);
   viewer.setMesh(state.mesh);
   if (refit) viewer.frame(state.mesh.size);
   const [w, l, h] = state.mesh.size;
@@ -144,6 +158,31 @@ function flush() {
   rebuild(refit);
 }
 
+function hasTransparency(image) {
+  const { data } = sampleImage(image, 64);
+  let clear = 0;
+  for (let i = 3; i < data.length; i += 4) if (data[i] < 128) clear++;
+  return clear > (data.length / 4) * 0.01;
+}
+
+async function detectObject(image) {
+  if (hasTransparency(image)) {
+    state.matte = null;
+    return;
+  }
+  let matte = null;
+  try {
+    matte = await findObject(image);
+  } catch (err) {
+    console.error(err);
+    state.notice = 'Smart cutout is unavailable, using colour instead.';
+  }
+  if (state.image !== image) return;
+  state.matte = matte;
+  state.prepared = null;
+  schedule(true);
+}
+
 async function loadFile(file) {
   if (!file?.type.startsWith('image/')) return setStatus('That file is not an image');
   let image;
@@ -155,6 +194,9 @@ async function loadFile(file) {
   state.image?.close();
   state.image = image;
   state.prepared = null;
+  state.matte = undefined;
+  state.notice = '';
+  detectObject(image);
   state.name = file.name.replace(/\.[^.]+$/, '') || 'model';
   if (state.thumbUrl) URL.revokeObjectURL(state.thumbUrl);
   state.thumbUrl = URL.createObjectURL(file);
@@ -229,6 +271,10 @@ for (const t of toggles) {
     schedule();
   });
 }
+$('method').addEventListener('change', () => {
+  refreshVisibility();
+  schedule();
+});
 $('export').addEventListener('click', exportStl);
 
 applyMode('relief');
