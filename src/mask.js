@@ -84,7 +84,7 @@ function floodBackground(mask, data, cols, rows, tolerance, edges) {
   }
 }
 
-function removeSpecks(mask, cols) {
+function components(mask, cols) {
   const labels = new Int32Array(mask.length).fill(-1);
   const sizes = [];
   const queue = new Int32Array(mask.length);
@@ -107,9 +107,21 @@ function removeSpecks(mask, cols) {
     }
     sizes.push(tail);
   }
-  const minSize = Math.max(9, sizes.reduce((m, s) => Math.max(m, s), 0) * 0.01);
+  return { labels, sizes, largest: sizes.reduce((m, s) => Math.max(m, s), 0) };
+}
+
+function removeSpecks(mask, cols) {
+  const { labels, sizes, largest } = components(mask, cols);
+  const minSize = Math.max(9, largest * 0.01);
   for (let i = 0; i < mask.length; i++) {
     if (mask[i] && sizes[labels[i]] < minSize) mask[i] = 0;
+  }
+}
+
+function keepLargest(mask, cols) {
+  const { labels, sizes, largest } = components(mask, cols);
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] && sizes[labels[i]] < largest) mask[i] = 0;
   }
 }
 
@@ -292,12 +304,17 @@ function mirror(mask, cols, rows) {
   }
 }
 
-export function buildMask({ cols, rows, data }, { cutout, tolerance, solid }) {
+export function buildMask({ cols, rows, data, matte }, { cutout, tolerance, solid }) {
   const mask = new Uint8Array(cols * rows).fill(1);
   if (!cutout) return mask;
-  const edges = solid ? edgeMap(data, cols, rows, Math.max(0.03, tolerance / 2)) : null;
-  floodBackground(mask, data, cols, rows, tolerance, edges);
+  if (matte) {
+    for (let i = 0; i < mask.length; i++) mask[i] = matte[i] >= 0.5 && data[i * 4 + 3] >= 128 ? 1 : 0;
+  } else {
+    const edges = solid ? edgeMap(data, cols, rows, Math.max(0.03, tolerance / 2)) : null;
+    floodBackground(mask, data, cols, rows, tolerance, edges);
+  }
   if (solid) {
+    if (matte) keepLargest(mask, cols);
     solidify(mask, cols, rows);
     removeHandles(mask, cols, rows);
     mirror(mask, cols, rows);
