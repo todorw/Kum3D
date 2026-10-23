@@ -44,6 +44,13 @@
         <input type="checkbox" id="cutout" checked>
         <span>Cut out background</span>
       </label>
+      <label class="field" id="methodField">
+        <span>Background removal</span>
+        <select id="method">
+          <option value="smart">Smart (AI)</option>
+          <option value="colour">By colour</option>
+        </select>
+      </label>
       <label class="field" id="toleranceField">
         <span>Background tolerance <output for="tolerance"></output>%</span>
         <input type="range" id="tolerance" min="0" max="50" step="1" value="15">
