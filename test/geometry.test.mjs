@@ -201,3 +201,15 @@ test('3mf is a valid zip with the mesh inside', () => {
   }
   assert.deepEqual(names, ['[Content_Types].xml', '_rels/.rels', '3D/3dmodel.model']);
 });
+
+test('round cutout trims an open hook handle', () => {
+  const sample = image(120, 110, (c, r) => {
+    if (r >= 5 && r < 105 && c >= 10 && c < 80) return [40, 45, 50];
+    if (r >= 20 && r < 28 && c >= 80 && c < 100) return [40, 45, 50];
+    if (r >= 20 && r < 60 && c >= 94 && c < 100) return [40, 45, 50];
+    return null;
+  });
+  const mask = buildMask(sample, { cutout: true, tolerance: 0.15, solid: true });
+  const widths = Array.from({ length: 110 }, (_, r) => mask.subarray(r * 120, r * 120 + 120).reduce((a, b) => a + b, 0));
+  assert.ok(Math.max(...widths) <= 74, `hook kept: ${Math.max(...widths)}`);
+});
