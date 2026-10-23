@@ -190,12 +190,15 @@ $('file').addEventListener('change', (e) => {
   e.target.value = '';
 });
 
-for (const type of ['dragover', 'drop']) window.addEventListener(type, (e) => e.preventDefault());
-$('drop').addEventListener('dragenter', () => $('drop').classList.add('over'));
-$('drop').addEventListener('dragleave', () => $('drop').classList.remove('over'));
-$('drop').addEventListener('drop', (e) => {
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
   $('drop').classList.remove('over');
-  loadFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+});
+$('drop').addEventListener('dragenter', () => $('drop').classList.add('over'));
+$('drop').addEventListener('dragleave', (e) => {
+  if (!$('drop').contains(e.relatedTarget)) $('drop').classList.remove('over');
 });
 
 document.addEventListener('paste', (e) => {
